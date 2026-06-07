@@ -70,11 +70,23 @@ def cache_http_get_factory(cache_dir: str) -> HttpGet:
 class RunSignupConnector(Connector):
     source = "runsignup"
 
-    def __init__(self, state=None, states=None, start_date=None, end_date=None,
+    def __init__(self, state=None, states=None, country_code="US",
+                 regions=None, start_date=None, end_date=None,
                  results_per_page=50, request_delay=0.5,
                  http_get=live_http_get, min_distance_km=None,
                  keep_types=None):
-        self.states = list(states) if states else ([state] if state else [None])
+        self.country_code = country_code
+        # "regions" = subdivisions (états US, provinces CA…).
+        # Compat ascendante : on accepte encore states= / state=.
+        if regions is not None:
+            self.regions = list(regions) if regions else [None]
+        elif states:
+            self.regions = list(states)
+        elif state:
+            self.regions = [state]
+        else:
+            self.regions = [None]
+        self.states = self.regions  # alias rétro-compat
         self.start_date = start_date
         self.end_date = end_date
         self.rpp = results_per_page
@@ -85,10 +97,10 @@ class RunSignupConnector(Connector):
 
     def fetch(self) -> list[Race]:
         races, seen = [], set()
-        for i, state in enumerate(self.states):
+        for i, region in enumerate(self.regions):
             if i > 0:
                 time.sleep(self.delay)
-            for raw in self._paginate(state):
+            for raw in self._paginate(region):
                 for race in self._to_models(raw):
                     if race.external_id in seen:
                         continue
@@ -103,13 +115,15 @@ class RunSignupConnector(Connector):
 
     # ── Pagination ──
 
-    def _paginate(self, state=None):
+    def _paginate(self, region=None):
         page = 1
         while True:
             params = {"format": "json", "events": "T", "distance_units": "K",
                       "results_per_page": self.rpp, "page": page}
-            if state:
-                params["state"] = state
+            if self.country_code:
+                params["country_code"] = self.country_code
+            if region:
+                params["state"] = region
             if self.start_date:
                 params["start_date"] = self.start_date
             if self.end_date:
