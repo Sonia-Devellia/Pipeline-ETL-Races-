@@ -1,0 +1,25 @@
+# Secrets / config locale
+.env
+
+# Bases de données locales (SQLite)
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Cache HTTP local du pipeline
+cache/
+*.cache
+
+# macOS / éditeurs
+.DS_Store
+.idea/
+.vscode/
+*.swp
