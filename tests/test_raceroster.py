@@ -13,6 +13,7 @@ _FAKE_EVENT = {
     "name": "London Trail Series",
     "city": "London",
     "country": {"code": "CA", "name": "Canada"},
+    "url": "https://raceroster.com/events/2026/abc123",
     "startDate": "2026-07-01T09:00:00+00:00",
     "subEvents": {"data": [
         {"subEventId": 1, "name": "10 km",
@@ -79,6 +80,8 @@ class RaceRosterFetchTest(unittest.TestCase):
         self.assertEqual(r.distance_km, 10.0)
         self.assertEqual(r.type, "trail")   # "Trail" dans le nom de l'event
         self.assertEqual(r.devise, "CAD")
+        self.assertEqual(r.nom, "London Trail Series – 10 km")
+        self.assertEqual(r.url, "https://raceroster.com/events/2026/abc123")
 
     def test_date_filters_passed_to_api(self):
         captured = []

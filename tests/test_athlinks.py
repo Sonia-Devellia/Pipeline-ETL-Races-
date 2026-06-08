@@ -14,6 +14,7 @@ _FAKE_RACE = {
     "raceName": "Alpine Trail Festival",
     "city": "Chamonix",
     "country": "FR",
+    "url": "https://www.athlinks.com/event/555",
     "raceCatName": "Running",
     "startDate": "2026-07-15T08:00:00",
     "courses": [
@@ -72,6 +73,8 @@ class AthlinksFetchTest(unittest.TestCase):
         self.assertEqual(r.date, "2026-07-15")
         self.assertEqual(r.distance_km, 21.097)
         self.assertEqual(r.type, "trail")
+        self.assertEqual(r.nom, "Alpine Trail Festival – 21 km")
+        self.assertEqual(r.url, "https://www.athlinks.com/event/555")
 
     def test_params_include_country_and_dates(self):
         captured = []

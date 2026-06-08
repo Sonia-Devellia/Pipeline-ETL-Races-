@@ -144,6 +144,7 @@ class RunSignupConnector(Connector):
     def _to_models(self, race: dict) -> list[Race]:
         addr = race.get("address") or {}
         name = race.get("name") or ""
+        url = race.get("url")
         race_date = _date_us_to_iso(race.get("next_date"))
 
         out = []
@@ -151,6 +152,8 @@ class RunSignupConnector(Connector):
             eid = ev.get("event_id")
             if eid is None:
                 continue
+            ev_name = ev.get("name") or ""
+            nom = name if not ev_name or ev_name == name else f"{name} – {ev_name}"
             out.append(Race(
                 source=self.source,
                 external_id=str(eid),
@@ -158,9 +161,11 @@ class RunSignupConnector(Connector):
                 pays=addr.get("country_code"),
                 ville=addr.get("city"),
                 distance_km=_parse_distance(ev.get("distance")),
-                type=_classify(ev.get("event_type"), name, ev.get("name") or ""),
+                type=_classify(ev.get("event_type"), name, ev_name),
                 prix=_parse_fee(ev.get("registration_periods")),
                 devise="USD",
+                nom=nom or None,
+                url=url,
             ))
         return out
 

@@ -32,6 +32,8 @@ class MySQLLoader(Loader):
         id           BIGINT       NOT NULL AUTO_INCREMENT,
         source       VARCHAR(64)  NOT NULL,
         external_id  VARCHAR(128) NOT NULL,
+        nom          VARCHAR(512) NULL,
+        url          VARCHAR(1024) NULL,
         date         DATE         NULL,
         pays         VARCHAR(8)   NULL,
         ville        VARCHAR(255) NULL,
@@ -45,14 +47,21 @@ class MySQLLoader(Loader):
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     """
 
+    # Ajoute les colonnes nom/url si la table existait déjà (migration douce).
+    MIGRATIONS = (
+        "ALTER TABLE races ADD COLUMN nom VARCHAR(512) NULL",
+        "ALTER TABLE races ADD COLUMN url VARCHAR(1024) NULL",
+    )
+
     UPSERT = """
     INSERT INTO races
-        (source, external_id, date, pays, ville,
+        (source, external_id, nom, url, date, pays, ville,
          distance_km, type, prix, devise, updated_at)
     VALUES
-        (%(source)s, %(external_id)s, %(date)s, %(pays)s, %(ville)s,
+        (%(source)s, %(external_id)s, %(nom)s, %(url)s, %(date)s, %(pays)s, %(ville)s,
          %(distance_km)s, %(type)s, %(prix)s, %(devise)s, %(updated_at)s)
     ON DUPLICATE KEY UPDATE
+        nom=VALUES(nom), url=VALUES(url),
         date=VALUES(date), pays=VALUES(pays), ville=VALUES(ville),
         distance_km=VALUES(distance_km), type=VALUES(type),
         prix=VALUES(prix), devise=VALUES(devise), updated_at=VALUES(updated_at);
@@ -67,6 +76,11 @@ class MySQLLoader(Loader):
         )
         with self.conn.cursor() as cur:
             cur.execute(self.DDL)
+            for migration in self.MIGRATIONS:
+                try:
+                    cur.execute(migration)
+                except Exception:
+                    pass  # colonne déjà présente
         self.conn.commit()
 
     def upsert(self, races: Iterable[Race]) -> tuple[int, int]:
@@ -119,6 +133,8 @@ class SQLiteLoader(Loader):
         id           INTEGER      NOT NULL PRIMARY KEY AUTOINCREMENT,
         source       TEXT         NOT NULL,
         external_id  TEXT         NOT NULL,
+        nom          TEXT         NULL,
+        url          TEXT         NULL,
         date         TEXT         NULL,
         pays         TEXT         NULL,
         ville        TEXT         NULL,
@@ -131,14 +147,21 @@ class SQLiteLoader(Loader):
     );
     """
 
+    MIGRATIONS = (
+        "ALTER TABLE races ADD COLUMN nom TEXT",
+        "ALTER TABLE races ADD COLUMN url TEXT",
+    )
+
     UPSERT = """
     INSERT INTO races
-        (source, external_id, date, pays, ville,
+        (source, external_id, nom, url, date, pays, ville,
          distance_km, type, prix, devise, updated_at)
     VALUES
-        (:source, :external_id, :date, :pays, :ville,
+        (:source, :external_id, :nom, :url, :date, :pays, :ville,
          :distance_km, :type, :prix, :devise, :updated_at)
     ON CONFLICT(source, external_id) DO UPDATE SET
+        nom=excluded.nom,
+        url=excluded.url,
         date=excluded.date,
         pays=excluded.pays,
         ville=excluded.ville,
@@ -153,6 +176,11 @@ class SQLiteLoader(Loader):
         import sqlite3
         self.conn = sqlite3.connect(path)
         self.conn.execute(self.DDL)
+        for migration in self.MIGRATIONS:
+            try:
+                self.conn.execute(migration)
+            except sqlite3.OperationalError:
+                pass  # colonne déjà présente
         self.conn.commit()
 
     def upsert(self, races: Iterable[Race]) -> tuple[int, int]:

@@ -55,6 +55,7 @@ function get_filter(string $key): ?string
 load_dotenv(dirname(__DIR__) . '/.env');
 
 $filters = [
+    'nom' => get_filter('nom'),
     'type' => get_filter('type'),
     'pays' => get_filter('pays'),
     'ville' => get_filter('ville'),
@@ -92,6 +93,10 @@ try {
     $where = ["type IN ('route', 'trail')"];
     $params = [];
 
+    if ($filters['nom']) {
+        $where[] = 'nom LIKE :nom';
+        $params['nom'] = '%' . $filters['nom'] . '%';
+    }
     if ($filters['type'] && in_array($filters['type'], $types, true)) {
         $where[] = 'type = :type';
         $params['type'] = $filters['type'];
@@ -126,7 +131,7 @@ try {
     }
 
     $sql = "
-        SELECT type, pays, ville, date, distance_km, prix, devise, source
+        SELECT nom, url, type, pays, ville, date, distance_km, prix, devise, source
         FROM races
     ";
     if ($where) {
@@ -321,6 +326,22 @@ try {
             font-weight: 750;
         }
 
+        .name-cell {
+            white-space: normal;
+            min-width: 220px;
+            max-width: 360px;
+            font-weight: 650;
+        }
+
+        .name-cell a {
+            color: var(--accent-dark);
+            text-decoration: none;
+        }
+
+        .name-cell a:hover {
+            text-decoration: underline;
+        }
+
         .muted {
             color: var(--muted);
         }
@@ -391,6 +412,12 @@ try {
     <?php else: ?>
         <form class="filters" method="get">
             <label>
+                Nom de la course
+                <input type="search" name="nom" placeholder="ex. Marathon de Paris"
+                       value="<?= h($filters['nom']) ?>">
+            </label>
+
+            <label>
                 Type
                 <select name="type">
                     <option value="">Tous</option>
@@ -458,6 +485,7 @@ try {
                 <table>
                     <thead>
                     <tr>
+                        <th>Course</th>
                         <th>Type</th>
                         <th>Pays</th>
                         <th>Ville</th>
@@ -470,6 +498,17 @@ try {
                     <tbody>
                     <?php foreach ($races as $race): ?>
                         <tr>
+                            <td class="name-cell">
+                                <?php if (!empty($race['nom'])): ?>
+                                    <?php if (!empty($race['url'])): ?>
+                                        <a href="<?= h($race['url']) ?>" target="_blank" rel="noopener noreferrer"><?= h($race['nom']) ?></a>
+                                    <?php else: ?>
+                                        <?= h($race['nom']) ?>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <span class="muted">-</span>
+                                <?php endif; ?>
+                            </td>
                             <td><span class="badge"><?= h($race['type']) ?></span></td>
                             <td><?= h($race['pays']) ?: '<span class="muted">-</span>' ?></td>
                             <td><?= h($race['ville']) ?: '<span class="muted">-</span>' ?></td>

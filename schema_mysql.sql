@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS races (
         id           BIGINT       NOT NULL AUTO_INCREMENT,
         source       VARCHAR(64)  NOT NULL,
         external_id  VARCHAR(128) NOT NULL,
+        nom          VARCHAR(512) NULL,
+        url          VARCHAR(1024) NULL,
         date         DATE         NULL,
         pays         VARCHAR(8)   NULL,
         ville        VARCHAR(255) NULL,

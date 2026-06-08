@@ -141,6 +141,7 @@ class RaceRosterConnector(Connector):
         country = (event.get("country") or {}).get("code")
         city = event.get("city")
         event_name = event.get("name") or ""
+        event_url = event.get("url")
         event_date = (event.get("startDate") or "")[:10] or None
         devise = _COUNTRY_CURRENCY.get((country or "").upper())
 
@@ -150,6 +151,9 @@ class RaceRosterConnector(Connector):
             if sid is None:
                 continue
             sub_dist = sub.get("subEventDistance") or {}
+            sub_name = sub.get("name") or ""
+            nom = (event_name if not sub_name or sub_name == event_name
+                   else f"{event_name} – {sub_name}")
             out.append(Race(
                 source=self.source,
                 external_id=f"{event.get('eventId')}:{sid}",
@@ -157,9 +161,11 @@ class RaceRosterConnector(Connector):
                 pays=country,
                 ville=city,
                 distance_km=_distance_km(sub),
-                type=_classify(sub_dist.get("type"), event_name, sub.get("name") or ""),
+                type=_classify(sub_dist.get("type"), event_name, sub_name),
                 prix=None,                # non fourni par /v1/events
                 devise=devise,
+                nom=nom or None,
+                url=event_url,
             ))
         return out
 

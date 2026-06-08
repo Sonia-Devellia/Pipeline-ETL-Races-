@@ -116,6 +116,7 @@ class AthlinksConnector(Connector):
         if rid is None:
             return []
         name = _first(race, "raceName", "RaceName", "name", default="") or ""
+        url = _first(race, "url", "raceUrl", "eventUrl", "logoUrl")
         date = _race_date(race)
         country = _first(race, "country", "countryID", "Country", "countryCode")
         city = _first(race, "city", "City")
@@ -130,12 +131,14 @@ class AthlinksConnector(Connector):
                 distance_km=None,
                 type=_classify(cat, name),
                 prix=None, devise=None,
+                nom=name or None, url=url,
             )]
 
         out = []
         for c in courses:
             cid = _first(c, "courseID", "CourseID", "courseId", "id")
             cname = _first(c, "courseName", "name", default="") or ""
+            nom = name if not cname or cname == name else f"{name} – {cname}"
             out.append(Race(
                 source=self.source,
                 external_id=f"{rid}:{cid}" if cid is not None else str(rid),
@@ -146,6 +149,8 @@ class AthlinksConnector(Connector):
                 type=_classify(cat, name, cname),
                 prix=None,
                 devise=None,
+                nom=nom or None,
+                url=url,
             ))
         return out
 

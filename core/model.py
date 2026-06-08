@@ -17,6 +17,8 @@ class Race:
     type: str                         # "route" | "trail" | "other"
     prix: Optional[float]
     devise: Optional[str] = None
+    nom: Optional[str] = None         # nom de la course
+    url: Optional[str] = None         # lien (page / inscription)
 
     def __post_init__(self):
         if self.type not in RACE_TYPES:
