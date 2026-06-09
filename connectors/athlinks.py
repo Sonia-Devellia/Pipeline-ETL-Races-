@@ -76,9 +76,9 @@ class AthlinksConnector(Connector):
             for race in self._to_models(raw):
                 if race.external_id in seen:
                     continue
-                if self.min_km and (race.distance_km is None
-                                    or race.distance_km < self.min_km):
-                    continue
+                if (self.min_km and race.distance_km is not None
+                        and race.distance_km < self.min_km):
+                    continue  # on garde les distances inconnues (None)
                 if self.keep_types and race.type not in self.keep_types:
                     continue
                 seen.add(race.external_id)

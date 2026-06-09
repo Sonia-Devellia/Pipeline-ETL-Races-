@@ -35,6 +35,14 @@ US_STATES = [
     "DC",
 ]
 
+# 10 provinces + 3 territoires canadiens.
+# L'API RunSignup requiert country_code=CA + state=<province> pour filtrer
+# correctement : sans province, elle renvoie des résultats hors Canada.
+CA_PROVINCES = [
+    "AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU",
+    "ON", "PE", "QC", "SK", "YT",
+]
+
 HttpGet = Callable[[str, dict], dict]
 
 
@@ -104,9 +112,9 @@ class RunSignupConnector(Connector):
                 for race in self._to_models(raw):
                     if race.external_id in seen:
                         continue
-                    if self.min_km and (race.distance_km is None
-                                       or race.distance_km < self.min_km):
-                        continue
+                    if (self.min_km and race.distance_km is not None
+                            and race.distance_km < self.min_km):
+                        continue  # on garde les distances inconnues (None)
                     if self.keep_types and race.type not in self.keep_types:
                         continue
                     seen.add(race.external_id)

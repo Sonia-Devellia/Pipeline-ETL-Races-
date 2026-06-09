@@ -56,6 +56,7 @@ load_dotenv(dirname(__DIR__) . '/.env');
 
 $filters = [
     'nom' => get_filter('nom'),
+    'source' => get_filter('source'),
     'type' => get_filter('type'),
     'pays' => get_filter('pays'),
     'ville' => get_filter('ville'),
@@ -75,7 +76,16 @@ $races = [];
 $types = ['route', 'trail'];
 $countries = [];
 $cities = [];
+$sources = [];
+$sourceCounts = [];
 $error = null;
+
+// Libellés lisibles pour les sources (API).
+$sourceLabels = [
+    'runsignup' => 'RunSignup',
+    'active' => 'ACTIVE',
+    'athlinks' => 'Athlinks',
+];
 
 try {
     $dsn = "mysql:host={$dbHost};dbname={$dbName};charset=utf8mb4";
@@ -89,6 +99,10 @@ try {
         ->fetchAll(PDO::FETCH_COLUMN);
     $cities = $pdo->query("SELECT DISTINCT ville FROM races WHERE type IN ('route', 'trail') AND ville IS NOT NULL AND ville <> '' ORDER BY ville")
         ->fetchAll(PDO::FETCH_COLUMN);
+    $sources = $pdo->query("SELECT DISTINCT source FROM races WHERE type IN ('route', 'trail') AND source IS NOT NULL AND source <> '' ORDER BY source")
+        ->fetchAll(PDO::FETCH_COLUMN);
+    $sourceCounts = $pdo->query("SELECT source, COUNT(*) AS n FROM races WHERE type IN ('route', 'trail') GROUP BY source ORDER BY n DESC")
+        ->fetchAll(PDO::FETCH_KEY_PAIR);
 
     $where = ["type IN ('route', 'trail')"];
     $params = [];
@@ -96,6 +110,10 @@ try {
     if ($filters['nom']) {
         $where[] = 'nom LIKE :nom';
         $params['nom'] = '%' . $filters['nom'] . '%';
+    }
+    if ($filters['source'] && in_array($filters['source'], $sources, true)) {
+        $where[] = 'source = :source';
+        $params['source'] = $filters['source'];
     }
     if ($filters['type'] && in_array($filters['type'], $types, true)) {
         $where[] = 'type = :type';
@@ -326,6 +344,42 @@ try {
             font-weight: 750;
         }
 
+        .sources {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            margin: -8px 0 18px;
+        }
+
+        .sources-label {
+            color: var(--muted);
+            font-weight: 650;
+            font-size: 0.9rem;
+        }
+
+        .source-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 4px 11px;
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        .source-pill strong {
+            color: var(--accent-dark);
+        }
+
+        .source-tag {
+            display: inline-block;
+            font-size: 0.82rem;
+            color: var(--muted);
+        }
+
         .name-cell {
             white-space: normal;
             min-width: 220px;
@@ -403,6 +457,18 @@ try {
         <?php endif; ?>
     </header>
 
+    <?php if (!$error && $sourceCounts): ?>
+        <div class="sources">
+            <span class="sources-label">Sources :</span>
+            <?php foreach ($sourceCounts as $src => $n): ?>
+                <span class="source-pill">
+                    <?= h($sourceLabels[$src] ?? $src) ?>
+                    <strong><?= (int) $n ?></strong>
+                </span>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+
     <?php if ($error): ?>
         <div class="alert">
             Connexion impossible à MySQL. Vérifiez <code>MYSQL_HOST</code>, <code>MYSQL_USER</code>,
@@ -415,6 +481,16 @@ try {
                 Nom de la course
                 <input type="search" name="nom" placeholder="ex. Marathon de Paris"
                        value="<?= h($filters['nom']) ?>">
+            </label>
+
+            <label>
+                Source (API)
+                <select name="source">
+                    <option value="">Toutes</option>
+                    <?php foreach ($sources as $src): ?>
+                        <option value="<?= h($src) ?>"<?= selected($filters['source'], $src) ?>><?= h($sourceLabels[$src] ?? $src) ?></option>
+                    <?php endforeach; ?>
+                </select>
             </label>
 
             <label>
@@ -528,7 +604,7 @@ try {
                                     <span class="muted">-</span>
                                 <?php endif; ?>
                             </td>
-                            <td><?= h($race['source']) ?></td>
+                            <td><span class="source-tag"><?= h($sourceLabels[$race['source']] ?? $race['source']) ?></span></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>

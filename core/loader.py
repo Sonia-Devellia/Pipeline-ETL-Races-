@@ -32,7 +32,7 @@ class MySQLLoader(Loader):
         id           BIGINT       NOT NULL AUTO_INCREMENT,
         source       VARCHAR(64)  NOT NULL,
         external_id  VARCHAR(128) NOT NULL,
-        nom          VARCHAR(512) NULL,
+        nom          TEXT         NULL,
         url          VARCHAR(1024) NULL,
         date         DATE         NULL,
         pays         VARCHAR(8)   NULL,
@@ -49,7 +49,8 @@ class MySQLLoader(Loader):
 
     # Ajoute les colonnes nom/url si la table existait déjà (migration douce).
     MIGRATIONS = (
-        "ALTER TABLE races ADD COLUMN nom VARCHAR(512) NULL",
+        "ALTER TABLE races ADD COLUMN nom TEXT NULL",
+        "ALTER TABLE races MODIFY COLUMN nom TEXT NULL",
         "ALTER TABLE races ADD COLUMN url VARCHAR(1024) NULL",
     )
 

@@ -6,7 +6,7 @@ Pour chaque connecteur : fetch() → upsert en base.
 import os
 from datetime import date, timedelta
 
-from connectors.runsignup import RunSignupConnector, US_STATES, cache_http_get_factory
+from connectors.runsignup import RunSignupConnector, US_STATES, CA_PROVINCES, cache_http_get_factory
 from core.loader import MySQLLoader, SQLiteLoader
 
 TARGET_TYPES = {"route", "trail"}
@@ -41,11 +41,15 @@ def main():
         state = os.environ.get("RUNSIGNUP_STATE", "CA")
         region_kw = {"states": US_STATES} if state.upper() in ("ALL", "US") else {"state": state}
     else:
-        # Hors US : filtrage par pays. On peut préciser des régions via
-        # RUNSIGNUP_REGIONS="ON,QC,BC" (sinon tout le pays).
+        # Hors US : l'API RunSignup ignore country_code sans province/région.
+        # On balaye toutes les provinces si aucune n'est précisée.
         regions_env = os.environ.get("RUNSIGNUP_REGIONS")
-        region_kw = ({"regions": [r.strip() for r in regions_env.split(",")]}
-                     if regions_env else {})
+        if regions_env:
+            region_kw = {"regions": [r.strip() for r in regions_env.split(",")]}
+        elif country == "CA":
+            region_kw = {"regions": CA_PROVINCES}
+        else:
+            region_kw = {}
 
     # ── Mode hors-ligne (cache local) ──
     cache_dir = os.environ.get("RUNSIGNUP_CACHE_DIR")
@@ -61,14 +65,13 @@ def main():
         )
     ]
 
-    # Race Roster (optionnel) — activé si les identifiants OAuth sont présents.
-    if os.environ.get("RACEROSTER_CLIENT_ID"):
-        from connectors.raceroster import RaceRosterConnector
-        connectors.append(RaceRosterConnector(
-            client_id=os.environ["RACEROSTER_CLIENT_ID"],
-            client_secret=os.environ.get("RACEROSTER_CLIENT_SECRET", ""),
-            username=os.environ.get("RACEROSTER_USERNAME", ""),
-            password=os.environ.get("RACEROSTER_PASSWORD", ""),
+    # ACTIVE Network (optionnel) — activé si une clé API est présente.
+    if os.environ.get("ACTIVE_API_KEY"):
+        from connectors.active import ActiveConnector
+        connectors.append(ActiveConnector(
+            api_key=os.environ["ACTIVE_API_KEY"],
+            country=os.environ.get("ACTIVE_COUNTRY"),
+            query=os.environ.get("ACTIVE_QUERY", ""),
             start_date=start, end_date=end,
             min_distance_km=5, keep_types=TARGET_TYPES,
         ))
