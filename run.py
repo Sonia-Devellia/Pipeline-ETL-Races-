@@ -76,6 +76,14 @@ def main():
             min_distance_km=5, keep_types=TARGET_TYPES,
         ))
 
+    # findarace (optionnel) — scraping UK, activé si FINDARACE_ENABLED=1.
+    if os.environ.get("FINDARACE_ENABLED") == "1":
+        from connectors.findarace import FindaraceConnector
+        connectors.append(FindaraceConnector(
+            max_pages=int(os.environ.get("FINDARACE_MAX_PAGES", "5")),
+            min_distance_km=5, keep_types=TARGET_TYPES,
+        ))
+
     # Athlinks (optionnel) — activé si une clé API est présente.
     if os.environ.get("ATHLINKS_API_KEY"):
         from connectors.athlinks import AthlinksConnector
