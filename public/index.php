@@ -123,9 +123,19 @@ $error = null;
 
 // Libellés lisibles pour les sources (API).
 $sourceLabels = [
-    'runsignup' => 'RunSignup',
-    'active' => 'ACTIVE',
-    'athlinks' => 'Athlinks',
+    'runsignup'  => 'RunSignup',
+    'active'     => 'ACTIVE',
+    'athlinks'   => 'Athlinks',
+    'findarace'  => 'FindARace',
+];
+
+// Libellés lisibles pour les codes pays.
+$countryLabels = [
+    'US' => 'États-Unis',
+    'CA' => 'Canada',
+    'GB' => 'Royaume-Uni (UK)',
+    'AU' => 'Australie',
+    'FR' => 'France',
 ];
 
 try {
@@ -617,7 +627,7 @@ try {
                 <select name="pays">
                     <option value="">Tous</option>
                     <?php foreach ($countries as $country): ?>
-                        <option value="<?= h($country) ?>"<?= selected($filters['pays'], $country) ?>><?= h($country) ?></option>
+                        <option value="<?= h($country) ?>"<?= selected($filters['pays'], $country) ?>><?= h($countryLabels[$country] ?? $country) ?></option>
                     <?php endforeach; ?>
                 </select>
             </label>
@@ -695,7 +705,7 @@ try {
                                 <?php endif; ?>
                             </td>
                             <td><span class="badge"><?= h($race['type']) ?></span></td>
-                            <td><?= h($race['pays']) ?: '<span class="muted">-</span>' ?></td>
+                            <td><?= $race['pays'] ? h($countryLabels[$race['pays']] ?? $race['pays']) : '<span class="muted">-</span>' ?></td>
                             <td><?= h($race['ville']) ?: '<span class="muted">-</span>' ?></td>
                             <td><?= h($race['date']) ?: '<span class="muted">-</span>' ?></td>
                             <td>

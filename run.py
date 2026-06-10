@@ -80,7 +80,7 @@ def main():
     if os.environ.get("FINDARACE_ENABLED") == "1":
         from connectors.findarace import FindaraceConnector
         connectors.append(FindaraceConnector(
-            max_pages=int(os.environ.get("FINDARACE_MAX_PAGES", "5")),
+            max_events=int(os.environ.get("FINDARACE_MAX_EVENTS", "200")),
             min_distance_km=5, keep_types=TARGET_TYPES,
         ))
 
