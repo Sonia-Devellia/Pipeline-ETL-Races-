@@ -41,6 +41,42 @@ function selected(?string $current, ?string $option): string
     return $current !== null && $current !== '' && $current === $option ? ' selected' : '';
 }
 
+function distance_label(?float $km, ?string $nom): string
+{
+    if ($km !== null) {
+        $formatted = number_format($km, 2, ',', ' ');
+        // Remove trailing zeros after comma
+        $formatted = rtrim(rtrim($formatted, '0'), ',');
+        return $formatted . ' km';
+    }
+
+    if ($nom === null) {
+        return '';
+    }
+
+    $sub = strpos($nom, '–') !== false
+        ? trim(substr($nom, strrpos($nom, '–') + strlen('–')))
+        : $nom;
+
+    $patterns = [
+        '/\bhalf.{0,6}marathon\b/i' => 'Half Marathon',
+        '/\bmarathon\b/i'           => 'Marathon',
+        '/\bultra\b/i'              => 'Ultra',
+        '/\b100\s?[Kk]\b/'         => '100K',
+        '/\b50\s?[Kk]\b/'          => '50K',
+        '/\b100.{0,3}[Mm]ile/i'    => '100 Miles',
+        '/\b50.{0,3}[Mm]ile/i'     => '50 Miles',
+    ];
+
+    foreach ($patterns as $regex => $label) {
+        if (preg_match($regex, $sub)) {
+            return $label;
+        }
+    }
+
+    return '';
+}
+
 function get_filter(string $key): ?string
 {
     $value = $_GET[$key] ?? null;
@@ -67,12 +103,17 @@ $filters = [
     'prix_max' => get_filter('prix_max'),
 ];
 
+$perPage = 100;
+$currentPage = max(1, (int) ($_GET['page'] ?? 1));
+
 $dbHost = env_value('MYSQL_HOST', 'localhost');
 $dbName = env_value('MYSQL_DB', 'kotcha_races');
 $dbUser = env_value('MYSQL_USER', 'root');
 $dbPassword = env_value('MYSQL_PASSWORD', 'root');
 
 $races = [];
+$totalRaces = 0;
+$totalPages = 1;
 $types = ['route', 'trail'];
 $countries = [];
 $cities = [];
@@ -148,17 +189,30 @@ try {
         $params['prix_max'] = $filters['prix_max'];
     }
 
+    $whereClause = $where ? ' WHERE ' . implode(' AND ', $where) : '';
+
+    $countStmt = $pdo->prepare("SELECT COUNT(*) FROM races" . $whereClause);
+    $countStmt->execute($params);
+    $totalRaces = (int) $countStmt->fetchColumn();
+    $totalPages = max(1, (int) ceil($totalRaces / $perPage));
+    $currentPage = min($currentPage, $totalPages);
+    $offset = ($currentPage - 1) * $perPage;
+
     $sql = "
         SELECT nom, url, type, pays, ville, date, distance_km, prix, devise, source
         FROM races
+    " . $whereClause . "
+        ORDER BY date IS NULL, date ASC, pays ASC, ville ASC, distance_km ASC
+        LIMIT :limit OFFSET :offset
     ";
-    if ($where) {
-        $sql .= ' WHERE ' . implode(' AND ', $where);
-    }
-    $sql .= ' ORDER BY date IS NULL, date ASC, pays ASC, ville ASC, distance_km ASC LIMIT 500';
 
     $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
+    foreach ($params as $key => $value) {
+        $stmt->bindValue($key, $value);
+    }
+    $stmt->bindValue('limit', $perPage, PDO::PARAM_INT);
+    $stmt->bindValue('offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
     $races = $stmt->fetchAll();
 } catch (Throwable $exception) {
     $error = $exception->getMessage();
@@ -380,6 +434,12 @@ try {
             color: var(--muted);
         }
 
+        .dist-label {
+            font-size: 0.82rem;
+            color: var(--muted);
+            font-style: italic;
+        }
+
         .name-cell {
             white-space: normal;
             min-width: 220px;
@@ -404,6 +464,55 @@ try {
             padding: 32px 18px;
             text-align: center;
             color: var(--muted);
+        }
+
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 20px;
+        }
+
+        .pagination a,
+        .pagination span {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 36px;
+            min-height: 36px;
+            border-radius: 6px;
+            border: 1px solid var(--line);
+            background: var(--panel);
+            color: var(--text);
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            text-decoration: none;
+        }
+
+        .pagination a:hover {
+            background: #f0f4f8;
+            border-color: #b0bac6;
+        }
+
+        .pagination .current {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .pagination .disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        .pagination-info {
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.88rem;
+            margin-top: 10px;
         }
 
         .alert {
@@ -453,7 +562,7 @@ try {
             <p class="subtitle">Vue filtrable connectée à la table MySQL <code>races</code>.</p>
         </div>
         <?php if (!$error): ?>
-            <div class="count"><?= count($races) ?> résultat<?= count($races) > 1 ? 's' : '' ?></div>
+            <div class="count"><?= number_format($totalRaces, 0, ',', ' ') ?> résultat<?= $totalRaces > 1 ? 's' : '' ?></div>
         <?php endif; ?>
     </header>
 
@@ -590,8 +699,18 @@ try {
                             <td><?= h($race['ville']) ?: '<span class="muted">-</span>' ?></td>
                             <td><?= h($race['date']) ?: '<span class="muted">-</span>' ?></td>
                             <td>
-                                <?php if ($race['distance_km'] !== null): ?>
-                                    <?= h(number_format((float) $race['distance_km'], 2, ',', ' ')) ?> km
+                                <?php
+                                    $distLabel = distance_label(
+                                        $race['distance_km'] !== null ? (float) $race['distance_km'] : null,
+                                        $race['nom'] ?? null
+                                    );
+                                ?>
+                                <?php if ($distLabel !== ''): ?>
+                                    <?php if ($race['distance_km'] !== null): ?>
+                                        <?= h($distLabel) ?>
+                                    <?php else: ?>
+                                        <span class="dist-label"><?= h($distLabel) ?></span>
+                                    <?php endif; ?>
                                 <?php else: ?>
                                     <span class="muted">-</span>
                                 <?php endif; ?>
@@ -611,6 +730,59 @@ try {
                 </table>
             <?php endif; ?>
         </section>
+
+        <?php if ($totalPages > 1): ?>
+            <?php
+                $baseParams = array_filter($filters, fn($v) => $v !== null);
+                function pagination_url(array $baseParams, int $page): string {
+                    $q = array_merge($baseParams, ['page' => $page]);
+                    return '?' . http_build_query($q);
+                }
+                $start = max(1, $currentPage - 3);
+                $end   = min($totalPages, $currentPage + 3);
+            ?>
+            <nav class="pagination" aria-label="Pagination">
+                <?php if ($currentPage > 1): ?>
+                    <a href="<?= h(pagination_url($baseParams, 1)) ?>" title="Première page">&laquo;</a>
+                    <a href="<?= h(pagination_url($baseParams, $currentPage - 1)) ?>">&lsaquo; Préc.</a>
+                <?php else: ?>
+                    <span class="disabled">&laquo;</span>
+                    <span class="disabled">&lsaquo; Préc.</span>
+                <?php endif; ?>
+
+                <?php if ($start > 1): ?>
+                    <a href="<?= h(pagination_url($baseParams, 1)) ?>">1</a>
+                    <?php if ($start > 2): ?><span class="disabled">&hellip;</span><?php endif; ?>
+                <?php endif; ?>
+
+                <?php for ($p = $start; $p <= $end; $p++): ?>
+                    <?php if ($p === $currentPage): ?>
+                        <span class="current"><?= $p ?></span>
+                    <?php else: ?>
+                        <a href="<?= h(pagination_url($baseParams, $p)) ?>"><?= $p ?></a>
+                    <?php endif; ?>
+                <?php endfor; ?>
+
+                <?php if ($end < $totalPages): ?>
+                    <?php if ($end < $totalPages - 1): ?><span class="disabled">&hellip;</span><?php endif; ?>
+                    <a href="<?= h(pagination_url($baseParams, $totalPages)) ?>"><?= $totalPages ?></a>
+                <?php endif; ?>
+
+                <?php if ($currentPage < $totalPages): ?>
+                    <a href="<?= h(pagination_url($baseParams, $currentPage + 1)) ?>">Suiv. &rsaquo;</a>
+                    <a href="<?= h(pagination_url($baseParams, $totalPages)) ?>" title="Dernière page">&raquo;</a>
+                <?php else: ?>
+                    <span class="disabled">Suiv. &rsaquo;</span>
+                    <span class="disabled">&raquo;</span>
+                <?php endif; ?>
+            </nav>
+            <p class="pagination-info">
+                Page <?= $currentPage ?> / <?= $totalPages ?>
+                &mdash; courses <?= number_format(($currentPage - 1) * $perPage + 1, 0, ',', ' ') ?>
+                à <?= number_format(min($currentPage * $perPage, $totalRaces), 0, ',', ' ') ?>
+                sur <?= number_format($totalRaces, 0, ',', ' ') ?>
+            </p>
+        <?php endif; ?>
     <?php endif; ?>
 </main>
 </body>
